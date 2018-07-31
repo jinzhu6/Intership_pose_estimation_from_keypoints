@@ -43,7 +43,7 @@ def findWMax(hm):
     return [W_max, score]
 
 
-def PoseFromKpts_WP(W,dict,varargin):
+def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     '''
     :param W: the maximal responses in the headmap
     :param dict: the cad model
@@ -52,3 +52,23 @@ def PoseFromKpts_WP(W,dict,varargin):
     '''
 
     # data size
+    B = dict.mu
+    pc = dict.pc
+    [k,p] =  B.shape
+    k /= 3
+
+    # setting values
+    if weight is None:
+        D = np.eye(p)
+    else:
+        D = np.diag(weight)
+
+    alpha = 1
+
+    # centralize basis
+
+
+
+
+
+    return 0 # TODO : implement this function

@@ -3,12 +3,12 @@ import cv2
 import utils
 import os
 import argparse
-from CAD import CAD
+from util_classes import CAD
 from utils import *
 
 
 cad = CAD()
-cad.load_cad()
+cad.load_model()
 
 path = './images_test'
 imname = path + '/' + 'val_01_00_000000.bmp'

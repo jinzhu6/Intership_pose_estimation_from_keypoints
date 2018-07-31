@@ -3,7 +3,7 @@ import cv2
 import utils
 import os
 import argparse
-from CAD import CAD
+from util_classes import Model, Template
 from utils import *
 
 
@@ -31,8 +31,12 @@ def main():
         exit()
 
     # loading the cad model
-    dict = CAD()
-    dict.load_cad()
+    cad = Model()
+    cad.load_model()
+
+    # loading dict
+    dict = Template(cad)
+
 
     # read heatmap and detect maximal responses
     heatmap = readHM(args.image_name, 8)
@@ -46,7 +50,7 @@ def main():
     W_hp_norm[1] = W_hp[1] - 32.0 / lens_f_rescale
 
     # pose estimation weak perspective
-    output_wp = PoseFromKps_WP(W_hp,dict,'weight',score,'verb',true,'lam',1,'tol',1e-10)
+    output_wp = PoseFromKpts_WP(W_hp, dict, weight=score, verb=True,  lam=1, tol=1e-10)
 
 
 
