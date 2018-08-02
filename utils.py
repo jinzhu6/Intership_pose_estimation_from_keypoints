@@ -1,10 +1,11 @@
-import numpy as np
+import autograd.numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv2
 import utils
 import os
 import time
 import sys
+from util_classes import Store, Output
 from pymanopt.manifolds import Stiefel
 from pymanopt import Problem
 from pymanopt.solvers import TrustRegions
@@ -15,6 +16,7 @@ from pymanopt.solvers import TrustRegions
 def readHM(filepath, M):
     '''
     read the output of the neural network and return the heatmaps
+    we use plt to read the image because it is simpler than cv2
     :param filepath : path to the file
     :param M : number of keypoints
     : : 3D array[64,64,M] with the raw keypoints
@@ -27,6 +29,15 @@ def readHM(filepath, M):
         HM[:,:,i] = plt.imread(hm_name)
 
     return HM/255.0
+
+def cropImage(image,center,scale):
+    w = 200*scale
+    h = w
+    x = center[0] - w/2
+    y = center[1] - h/2
+    bbox = [x,y,w,h]
+    padsize = np.round(bbox[2:4])
+
 
 def findWMax(hm):
     '''
@@ -180,9 +191,10 @@ def estimateR_weighted(S,W,D,R0):
 
     # we use the optimization on a Stiefel manifold because R is constrained to be othogonal
     manifold = Stiefel(n,p,1)
-
+    # creation of the store object, for now it is not usefull be may contribute the the improvement of the code
+    store = Store()
     ####################################################################################################################
-    def cost(X,store):
+    def cost(X):
         '''
         cost function of the manifold, the cost is trace(E'*D*E)/(2*N) with E = A*X - B or store.E
         :param X : vector
@@ -190,13 +202,15 @@ def estimateR_weighted(S,W,D,R0):
         :return : [f,score] f is the score, store is the Store object
         '''
         if store.E is None:
-            store.E = np.dot(A,X)-B
+            store.E = np.dot(A,np.transpose(X))-B
 
         E = store.E
         f = np.trace(np.dot(np.transpose(E),np.dot(D,E)))/2
 
         return f
-    def grad(X,store):
+    # TODO : compare the performance of the default gradient and this gradient
+    # TODO : debug this custom grad function
+    def grad(X):
         '''
         grad function of the manifold, the gradient is the reimannian gradient computed with the manifold
         :param X : vector
@@ -204,20 +218,20 @@ def estimateR_weighted(S,W,D,R0):
         :return : [g,store] g is the gradient and store is the Store object
         '''
         if store.E is None:
-            [_, store] = cost(X,store)
+            _ = cost(X)
 
         E = store.E
         # compute the euclidean gradient of the cost with the rotations R and the cloud A
-        egrad = np.dot(At,np,dot(D,E))
+        egrad = np.dot(At,np.dot(D,E))
         # transform this euclidean gradient into the Riemmanian gradient
-        g = manifold.egrad2rgrad(X,egrad)
+        g = manifold.egrad2rgrad(np.transpose(X),egrad)
         store.egrad = egrad
 
         return np.array(g)
     ####################################################################################################################
 
     # setup the problem structure with manifold M and cost and grad function
-    problem = Problem(manifold=manifold, cost=cost, grad=grad, verbosity=0)
+    problem = Problem(manifold=manifold, cost=cost, verbosity=0)
 
     # setup the trust region algorithm to solve the problem
     TR = TrustRegions(maxiter=10)
@@ -225,16 +239,42 @@ def estimateR_weighted(S,W,D,R0):
     # solve the problem
     X = TR.solve(problem,X0)
 
-    # R = np.transpose(X)
+    return np.transpose(X) # return R = X'
+
+def estimateC_weighted(W,R,B,D,lam):
+    '''
+    :param W : the heatmap
+    :param R : the rotation matrix
+    :param B : the base matrix
+    :param D : the weight
+    :param lam : lam value used to simplify some results
+    :return : C0
+    '''
+    p = len(W[0])
+    k = int(B.shape[0]/3)
+    d = np.diag(D)
+    D = np.zeros((2*p,2*p))
+    eps = sys.float_info.epsilon
+
+    for i in range(p):
+        D[2*i, 2*i] = d[i];
+        D[2*i+1, 2*i+1] = d[i];
+
+    # next we work on the linear system y = X*C
+    y = W.flatten() # vectorized W
+    X = np.zeros((2*p,k)) # each colomn is a rotated Bk
+
+    for i in range(k):
+        RBi = np.dot(R,B[3*i:3*(i+1),:])
+        X[:,i] = RBi.flatten()
 
 
+    # we want to calculate C = pinv(X'*D*X+lam*eye(size(X,2)))*X'*D*y and then C = C'
+    A = np.dot(np.dot(np.transpose(X),D),X) + lam*np.eye(X.shape[1])
+    tol = max(A.shape) * np.linalg.norm(A,np.inf) * eps
+    C = np.dot(np.dot(np.linalg.pinv(A),np.dot(np.transpose(X),D)),y)
 
-
-
-
-
-
-
+    return np.transpose(C)
 
 def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     '''
@@ -242,11 +282,11 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     :param W: the maximal responses in the headmap
     :param dict: the cad model
     :param varargin: other variables
-    :return: TODO : document the return
+    :return ; return a Output object containing many informations
     '''
 
     # data size
-    B = np.copy(dict.mu)
+    B = np.copy(dict.mu)  # B is the base
     pc = np.copy(dict.pc)
     [k,p] =  B.shape
     k = int(k/3)
@@ -280,7 +320,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     BBt = np.dot(B,np.dot(D,np.transpose(B)))
 
     # iteration
-    for iter in range(1):
+    for iter in range(1000):
 
         # update translation
         T = np.sum(np.dot((W-np.matmul(Z,B)),D), 1) / (np.sum(D)+eps) # T = sum((W-Z*B)*D, 1) / (sum(D)+eps)
@@ -308,7 +348,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
         if verb:
             print('Iter = ', iter, ' ; PrimRes = ',PrimRes, '; DualRes = ', DualRes,' ; mu = ', '{:08.6f}'.format(mu), '\n')
 
-        # convergente ?
+        # check convergente
         if PrimRes < tol and DualRes < tol:
             break
         else:
@@ -319,7 +359,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
             else:
                 pass
 
-    # fin iteration
+    # end iteration
 
     [R, C] = syncRot(M)
     if np.sum(np.abs(R)) == 0:
@@ -332,15 +372,56 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     # iteration, part 2
     fval = np.inf
 
-    for iter in range(1):
-
-        # update translation
-        T = np.sum(np.dot((W-np.matmul(R,S)),D), 1) / (np.sum(D)+eps) # T = sum((W-R*S)*D, 1) / (sum(D)+eps)
+    for iter in range(1000):
+        T = np.sum(np.dot((W-np.dot(R,S)),D), 1) / (np.sum(D)+eps) # T = sum((W-R*S)*D, 1) / (sum(D)+eps)
         W2fit = np.copy(W)
         W2fit[0] -= T[0]
         W2fit[1] -= T[1]
 
         # update rotation
-        estimateR_weighted(S, W2fit, D, R)
+        R = np.transpose(estimateR_weighted(S, W2fit, D, R))
 
-    return 0 # TODO : implement this function
+
+        # update shape
+        if len(pc) == 0:
+            C0 = estimateC_weighted(W2fit, R, B, D, 1e-3)[0]
+            S = C0*B
+        else:
+            W_1 = W2fit - np.dot(np.dot(R , np.kron(C, eye(3))) , pc)
+            C0 = estimateC_weighted(W_1, R, B, D, 1e-3)
+            W_2 = W2fit - np.dot(np.dot(R , C0) , B)
+            C = estimateC_weighted(W_2, R, pc, D, lam)
+            S = np.dot(C0,B) + np.dot(np.kron(C,np.eye(3)),pc)
+
+        fvaltml = fval
+        # fval = 0.5*norm((W2fit-R*S)*sqrt(D),'fro')^2 + 0.5*norm(C)^2;
+        fval = 0.5*np.linalg.norm(np.dot(W2fit-np.dot(R,S),np.sqrt(D)),'fro')**2 + 0.5*np.linalg.norm(C)**2
+
+        # show output
+        if verb:
+            print('Iter = ', iter, 'fval = ', fval)
+
+        # check convergence
+        if np.abs(fval-fvaltml)/fvaltml < tol:
+            break
+
+    # end iteration
+    R2 = np.zeros((3,3))
+    R2[0,:] = R[0,:]
+    R2[1, :] = R[1, :]
+    R2[2,:] = np.cross(R[0,:],R[1, :])
+    output = Output(S, M, R, C ,C0, T, fval)
+
+    return output
+
+def PoseFromKpts_FP():
+    '''
+    compute the pose with weak perspective
+    :param W: the maximal responses in the headmap
+    :param dict: the cad model
+    :param varargin: other variables
+    :return ; return a Output object containing many informations
+    '''
+
+
+

@@ -3,8 +3,9 @@ import cv2
 import utils
 import os
 import argparse
-from util_classes import Model, Template
+from util_classes import Model, Template, Store
 from utils import *
+from PIL import Image
 
 
 def parse_args():
@@ -52,8 +53,16 @@ def main():
     # pose estimation weak perspective
     output_wp = PoseFromKpts_WP(W_hp, dict, weight=score, verb=True,  lam=1, tol=1e-10)
 
+    lens_f_cam = lens_f_rescale * 4
+    K_cam = [[lens_f_cam, 0, 128],[0, lens_f_cam, 128],[0, 0, 1]]
 
+    # we use cv2 to read the image to use the cv2 function later
+    img = cv2.imread(args.image_name)
 
+    # crop image
+    center = [128, 128]
+    scale = 1.28
+    cropImage(img,[50,50],30)
 
 if __name__ == '__main__':
     main()

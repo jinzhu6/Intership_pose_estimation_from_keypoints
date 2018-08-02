@@ -106,3 +106,27 @@ class Template:
 
         self.B = S # B is the normalized version of S, this normalisation is pretty stange
 
+
+class Store:
+    '''
+    Implementation of the storage class that may enable some improvement of the code in the future
+    '''
+
+    def __init__(self):
+        self.E = None
+
+
+class Output:
+    '''
+    An object of this class represents the output of the function PoseFromKpts_WP or PoseFromKpts_FP
+    '''
+
+    def __init__(self, S, M, R, C, C0, T, fval):
+        self.S = S
+        self.M = M
+        self.R = R
+        self.C = C
+        self.C0 = C0
+        self.T = T
+        self.fval = fval
+
