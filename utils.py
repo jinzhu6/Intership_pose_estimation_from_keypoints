@@ -31,12 +31,22 @@ def readHM(filepath, M):
     return HM/255.0
 
 def cropImage(image,center,scale):
-    w = 200*scale
-    h = w
-    x = center[0] - w/2
-    y = center[1] - h/2
-    bbox = [x,y,w,h]
-    padsize = np.round(bbox[2:4])
+    '''
+    crop the image and rezise it as an 200 by 200 image
+    :param image : the image you want to resize
+    :param center : the center of the image form which you want to resize the image
+    :param scale : the cropping scale
+    :return : the cropped and resized image
+    '''
+
+    w = int(200*scale)
+    h = int(w)
+    x = int(center[0] - w/2)
+    y = int(center[1] - h/2)
+    im = cv2.copyMakeBorder( image, w, w, h, h, cv2.BORDER_CONSTANT)
+    im1 = im[w:x+2*w,h:y+2*h]
+    im1 = cv2.resize(im1, (200, 200), interpolation=cv2.INTER_CUBIC)
+    return im1
 
 
 def findWMax(hm):

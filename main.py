@@ -62,7 +62,7 @@ def main():
     # crop image
     center = [128, 128]
     scale = 1.28
-    cropImage(img,[50,50],30)
+    cropImage(img,center,scale)
 
 if __name__ == '__main__':
     main()
