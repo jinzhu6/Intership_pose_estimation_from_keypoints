@@ -118,11 +118,13 @@ def proj_deformable_approx(X):
     d = int(r / 3)
     A = np.zeros((3,3))
 
+
     for i in range(d):
         Ai = X[3*i:3*(i+1),:]
         A = A + np.dot(Ai,np.transpose(Ai))
 
-    [U, S, V] = np.linalg.svd(A)
+    [U, S, V] = np.linalg.svd(A) #TODO : probleme avec la svd de python par rapport a celle de matlab il y a des colones inversees
+
     Q = U[:,0:2]
     G = np.zeros((2,2))
     for i in range(d):
@@ -130,7 +132,12 @@ def proj_deformable_approx(X):
         Ti = np.dot(np.transpose(Q),Ai)
         gi = [ np.trace(Ti) , Ti[1,0] - Ti[0,1] ]
         G = G + np.dot(gi, np.transpose(gi))
-
+    print(np.round(Q,4), '\n')
+    print(X,'\n')
+    print(Ai,'\n')
+    print(Ti,'\n')
+    print(gi,'\n')
+    print(G,'\n')
     [U1, S1, V1] = np.linalg.svd(G)
     G = np.zeros((2,2))
     for i in range(d):
@@ -168,8 +175,6 @@ def syncRot(T):
     :return : [R,C] the rotation matrix and the values of a sorte of norm that is do not really understand
     '''
     [_, L, Q] = proj_deformable_approx(np.transpose(T))
-    print(L)
-    print(Q)
     s = np.sign(L[np.argmax(np.abs(L))])
     C = s*np.transpose(L)
     R = np.zeros((3,3))
