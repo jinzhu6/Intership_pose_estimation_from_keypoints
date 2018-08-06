@@ -14,17 +14,17 @@ class Model:
         self.nb_vertices = 0
         self.faces = []
         self.vertices = []
-        self.pname = ['fru', 'frd', 'flu', 'fld', 'bru', 'brd', 'blu', 'bld']
-        self.fru = [0.0800, 0.1150, 0.0300]
-        self.frd = [0.0800, 0.1150, -0.0300]
-        self.flu = [0.0800, -0.1150, 0.0300]
-        self.fld = [0.0800, -0.1150, -0.0300]
-        self.bru = [-0.0800, 0.1150, 0.0300]
-        self.brd = [-0.0800, 0.1150, -0.0300]
-        self.blu = [-0.0800, -0.1150, 0.0300]
-        self.bld = [-0.0800, -0.1150, -0.0300]
-        self.scale = [0.16, 0.23, 0.06]
-        self.kp = [
+        self.pname = np.array(['fru', 'frd', 'flu', 'fld', 'bru', 'brd', 'blu', 'bld'])
+        self.fru = np.array([0.0800, 0.1150, 0.0300])
+        self.frd = np.array([0.0800, 0.1150, -0.0300])
+        self.flu = np.array([0.0800, -0.1150, 0.0300])
+        self.fld = np.array([0.0800, -0.1150, -0.0300])
+        self.bru = np.array([-0.0800, 0.1150, 0.0300])
+        self.brd = np.array([-0.0800, 0.1150, -0.0300])
+        self.blu = np.array([-0.0800, -0.1150, 0.0300])
+        self.bld = np.array([-0.0800, -0.1150, -0.0300])
+        self.scale = np.array([0.16, 0.23, 0.06])
+        self.kp = np.array([
             [self.scale[0] / 2, self.scale[1] / 2, self.scale[2] / 2],
             [self.scale[0] / 2, self.scale[1] / 2, -self.scale[2] / 2],
             [self.scale[0] / 2, -self.scale[1] / 2, self.scale[2] / 2],
@@ -32,7 +32,7 @@ class Model:
             [-self.scale[0] / 2, self.scale[1] / 2, self.scale[2] / 2],
             [-self.scale[0] / 2, self.scale[1] / 2, -self.scale[2] / 2],
             [-self.scale[0] / 2, -self.scale[1] / 2, self.scale[2] / 2],
-            [-self.scale[0] / 2, -self.scale[1] / 2, -self.scale[2] / 2]]
+            [-self.scale[0] / 2, -self.scale[1] / 2, -self.scale[2] / 2]])
 
 
     def load_model(self, path='data_files', name_file_faces='cad_faces.csv', name_file_vertices='cad_vertices.csv'):
@@ -77,7 +77,28 @@ class Model:
         self.nb_faces = len(self.faces)
         self.nb_vertices = len(self.vertices)
 
+        self.vertices = np.array(self.vertices)
+        self.faces = np.array(self.faces)
 
+    def copy(self):
+        model_copy = Model()
+        model_copy.nb_faces = self.nb_faces
+        model_copy.nb_vertices = self.nb_vertices
+        model_copy.faces = np.copy(self.faces)
+        model_copy.vertices = np.copy(self.vertices)
+        model_copy.pname = np.copy(self.pname)
+        model_copy.fru = np.copy(self.fru)
+        model_copy.frd = np.copy(self.frd)
+        model_copy.flu = np.copy(self.flu)
+        model_copy.fld = np.copy(self.fld)
+        model_copy.bru = np.copy(self.bru)
+        model_copy.brd = np.copy(self.brd)
+        model_copy.blu = np.copy(self.blu)
+        model_copy.bld = np.copy(self.bld)
+        model_copy.scale = np.copy(self.scale)
+        model_copy.kp = np.copy(self.kp)
+
+        return model_copy
 
 
 class Template:

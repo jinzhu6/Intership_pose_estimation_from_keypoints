@@ -5,7 +5,7 @@ import utils
 import os
 import time
 import sys
-from util_classes import Store, Output
+from util_classes import Store, Output, Model
 from pymanopt.manifolds import Stiefel
 from pymanopt import Problem
 from pymanopt.solvers import TrustRegions
@@ -46,6 +46,7 @@ def cropImage(image,center,scale):
     im = cv2.copyMakeBorder( image, w, w, h, h, cv2.BORDER_CONSTANT)
     im1 = im[w:x+2*w,h:y+2*h]
     im1 = cv2.resize(im1, (200, 200), interpolation=cv2.INTER_CUBIC)
+
     return im1
 
 
@@ -420,7 +421,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     R2[0,:] = R[0,:]
     R2[1, :] = R[1, :]
     R2[2,:] = np.cross(R[0,:],R[1, :])
-    output = Output(S, M, R, C ,C0, T, fval)
+    output = Output(S, M, R2, C ,C0, T, fval)
 
     return output
 
@@ -432,6 +433,64 @@ def PoseFromKpts_FP():
     :param varargin: other variables
     :return ; return a Output object containing many informations
     '''
+    pass
+
+def findRotation(S1,S2):
+    '''
+    find the rotation matrix between S1 and S2
+    :param S1 : matrix 1
+    :param S2 : matrix 2
+    :return : R, the rotation R*S1 = S2
+    '''
+    [f,p] = S1.shape
+    f = int(f/3)
+    S1 = np.reshape(S1,(3,f*p))
+    S2 = np.reshape(S2,(3,f*p))
+    R = np.dot(S1,np.transpose(S2))
+    # /!\ the matlab svd computes R = USV' and the python svd computes R = USV
+    [U, _, V] = np.linalg.svd(R)
+    R = U*V
+    R = U * np.diag([1.0,1.0,np.linalg.det(R)]) * V
+
+    return R
+
+def fullShape(S1,model):
+    '''
+    creates the new model besed on the S
+    :param S1 : the matrix S (I do not know what it is exactly
+    :param model : an object of the class Model
+    :return : the new object Model, and some other information and transformation matrix
+    '''
+    eps = sys.float_info.epsilon
+
+    # normalization of S
+    S2 = np.copy(np.transpose(model.kp))
+    T1 = np.mean(S1,1)
+    T2 = np.mean(S2,1)
+    for i in range(len(T1)):
+        S1[i] -= T1[i]
+        S2[i] -= T2[i]
+
+    R = findRotation(S1,S2)
+    S2 = np.dot(R,S2)
+    w = np.trace(np.dot(np.transpose(S1), S2))/(np.trace(np.dot(np.transpose(S2), S2))+eps);
+    T = T1 - w*np.dot(R,T2)
+
+    vertices = np.transpose(model.vertices)
+
+    for i in range(len(T)):
+        vertices[i] = vertices[i] - T2[i]
+
+    vertices = w*np.dot(R,vertices)
+
+    for i in range(len(T)):
+        vertices[i] = vertices[i] + T1[i]
+
+    model_new = model.copy()
+    model_new.vertices = np.transpose(vertices)
+    model_new.nb_vertices = len(vertices)
+
+    return [model_new,w,R,T]
 
 
 

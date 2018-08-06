@@ -51,7 +51,7 @@ def main():
     W_hp_norm[1] = W_hp[1] - 32.0 / lens_f_rescale
 
     # pose estimation weak perspective
-    output_wp = PoseFromKpts_WP(W_hp, dict, weight=score, verb=True,  lam=1, tol=1e-10)
+    opt_wp = PoseFromKpts_WP(W_hp, dict, weight=score, verb=True,  lam=1, tol=1e-10)
 
     lens_f_cam = lens_f_rescale * 4
     K_cam = [[lens_f_cam, 0, 128],[0, lens_f_cam, 128],[0, 0, 1]]
@@ -63,6 +63,29 @@ def main():
     center = [128, 128]
     scale = 1.28
     cropImage(img,center,scale)
+
+    # weak perpective
+    S_wp = np.dot(opt_wp.R,opt_wp.S)
+    S_wp[0] += opt_wp.T[0]
+    S_wp[1] += opt_wp.T[1]
+
+    [model_wp, _, _, _] = fullShape(S_wp, cad)
+    mesh2d_wp = np.transpose(model_wp.vertices[:,0:2])*200/heatmap.shape[1]
+
+    print(heatmap.shape)
+    response = np.sum(heatmap,2)
+    print(response.shape)
+    max_value = np.amax(response)
+    print(max_value)
+
+    mapIm = np.zeros(64,64,3)
+    mapIm[:, :, 0] = response / max_value
+    mapIm[:, :, 1] = response / max_value
+    mapIm[:, :, 2] = response / max_value
+    print(mapIm.shape)
+    plt.imshow(mapIm)
+    plt.show()
+
 
 if __name__ == '__main__':
     main()
