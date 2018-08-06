@@ -49,7 +49,6 @@ def cropImage(image,center,scale):
 
     return im1
 
-
 def findWMax(hm):
     '''
     read the heatmap and return the coordinates of the values of the maximum of the heatmap
@@ -63,8 +62,8 @@ def findWMax(hm):
     for i in range(p):
         score[i] = np.amax(hm[:,:,i])
         (x,y) = np.where(hm[:,:,i]==score[i])
-        W_max[0,i] = x[0]
-        W_max[1,i] = y[0]
+        W_max[0,i] = y[0] + 1
+        W_max[1,i] = x[0] + 1 # +1 to compare with matlab
 
     return [W_max, score]
 
@@ -169,6 +168,8 @@ def syncRot(T):
     :return : [R,C] the rotation matrix and the values of a sorte of norm that is do not really understand
     '''
     [_, L, Q] = proj_deformable_approx(np.transpose(T))
+    print(L)
+    print(Q)
     s = np.sign(L[np.argmax(np.abs(L))])
     C = s*np.transpose(L)
     R = np.zeros((3,3))
@@ -319,7 +320,6 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     M = np.zeros([2, 3 * k]);
     C = np.zeros(k); # norm of each Xi
 
-
     # auxiliary variable for ADMM
     Z = np.copy(M)
     Y = np.copy(M)
@@ -331,7 +331,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     BBt = np.dot(B,np.dot(D,np.transpose(B)))
 
     # iteration
-    for iter in range(1000):
+    for iter in range(1):
 
         # update translation
         T = np.sum(np.dot((W-np.matmul(Z,B)),D), 1) / (np.sum(D)+eps) # T = sum((W-Z*B)*D, 1) / (sum(D)+eps)
@@ -342,7 +342,6 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
         # update motion matrix Z
         Z0 = np.copy(Z)
         Z = np.dot( np.dot(W2fit,np.dot(D,np.transpose(B))) + mu*M + Y , np.linalg.inv(BBt+mu*np.eye(3*k))) # Z = (W2fit*D*B'+mu*M+Y)/(BBt+mu*eye(3*k))
-
         # update motion matrix M
         Q = Z - Y/mu
         for i in range(k):
@@ -352,8 +351,8 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
 
         # update dual variable
         Y = Y + mu*(M-Z)
-        PrimRes = np.linalg.norm(M-Z) / (np.linalg.norm(Z0)+eps);
-        DualRes = mu*np.linalg.norm(Z - Z0) / (np.linalg.norm(Z0)+eps);
+        PrimRes = np.linalg.norm(M-Z) / (np.linalg.norm(Z0)+eps)
+        DualRes = mu*np.linalg.norm(Z - Z0) / (np.linalg.norm(Z0)+eps)
 
         # show output
         if verb:
@@ -373,6 +372,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     # end iteration
 
     [R, C] = syncRot(M)
+
     if np.sum(np.abs(R)) == 0:
         R = np.eye(3)
 
@@ -380,10 +380,11 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     S = np.dot(np.kron(C,np.eye(3)),B)
 
 
+
     # iteration, part 2
     fval = np.inf
 
-    for iter in range(1000):
+    for iter in range(1):
         T = np.sum(np.dot((W-np.dot(R,S)),D), 1) / (np.sum(D)+eps) # T = sum((W-R*S)*D, 1) / (sum(D)+eps)
         W2fit = np.copy(W)
         W2fit[0] -= T[0]
