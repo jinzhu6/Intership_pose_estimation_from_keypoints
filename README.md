@@ -1,8 +1,9 @@
 #6DoF Pose estimation from keypoints
 
 This code is the python adaptation of the matlab post processing you can find here : https://github.com/wbenbihi/hourglasstensorlfow
- 
-I just translated the matlab code into python code, I did not inveted anythink
+I also used the their neural network in an other repo.
+
+I just translated the matlab code into python code, I did not invented anything
  
 Feel free to use this code if you need it.
 
