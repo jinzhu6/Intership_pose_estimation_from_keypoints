@@ -5,10 +5,12 @@ import utils
 import os
 import time
 import sys
-from util_classes import Store, Output, Model
+from util_classes import Store, Output, Model, Template
 from pymanopt.manifolds import Stiefel
 from pymanopt import Problem
 from pymanopt.solvers import TrustRegions
+from matplotlib.patches import Circle, Wedge, Polygon
+from matplotlib.collections import PatchCollection
 
 
 
@@ -123,30 +125,26 @@ def proj_deformable_approx(X):
         Ai = X[3*i:3*(i+1),:]
         A = A + np.dot(Ai,np.transpose(Ai))
 
-    [U, S, V] = np.linalg.svd(A) #TODO : probleme avec la svd de python par rapport a celle de matlab il y a des colones inversees
+    [U, S, V] = np.linalg.svd(A,4)
 
     Q = U[:,0:2]
     G = np.zeros((2,2))
     for i in range(d):
         Ai = X[3*i:3*(i+1),:]
         Ti = np.dot(np.transpose(Q),Ai)
-        gi = [ np.trace(Ti) , Ti[1,0] - Ti[0,1] ]
-        G = G + np.dot(gi, np.transpose(gi))
-    print(np.round(Q,4), '\n')
-    print(X,'\n')
-    print(Ai,'\n')
-    print(Ti,'\n')
-    print(gi,'\n')
-    print(G,'\n')
+        gi = np.array([ np.trace(Ti) , Ti[1,0] - Ti[0,1] ])
+        G = G + np.outer(gi,np.transpose(gi)) # it is really import to use outer and not dot !!! test yourself
+
     [U1, S1, V1] = np.linalg.svd(G)
+
     G = np.zeros((2,2))
     for i in range(d):
         Ai = X[3*i:3*(i+1),:]
         Ti = np.dot(np.transpose(Q),Ai)
-        gi = [ Ti[0,0]-Ti[1,1] , Ti[0,1]+Ti[1,0] ]
-        G = G + np.dot(gi, np.transpose(gi))
+        gi = np.array([ Ti[0,0]-Ti[1,1] , Ti[0,1]+Ti[1,0] ])
+        G = G + np.outer(gi, np.transpose(gi))
 
-    [U2, S2, V2] = np.linalg.svd(G)
+    [U2, S2, V2] = np.linalg.svd(G,4)
 
     if S1[0] > S2[0]:
         u = U1[:,0]
@@ -258,7 +256,7 @@ def estimateR_weighted(S,W,D,R0):
 
     return np.transpose(X) # return R = X'
 
-def estimateC_weighted(W,R,B,D,lam):
+def estimateC_weighted(W, R, B, D, lam):
     '''
     :param W : the heatmap
     :param R : the rotation matrix
@@ -336,7 +334,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     BBt = np.dot(B,np.dot(D,np.transpose(B)))
 
     # iteration
-    for iter in range(1):
+    for iter in range(1000):
 
         # update translation
         T = np.sum(np.dot((W-np.matmul(Z,B)),D), 1) / (np.sum(D)+eps) # T = sum((W-Z*B)*D, 1) / (sum(D)+eps)
@@ -384,12 +382,10 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     R = R[0:2,:]
     S = np.dot(np.kron(C,np.eye(3)),B)
 
-
-
     # iteration, part 2
     fval = np.inf
 
-    for iter in range(1):
+    for iter in range(1000):
         T = np.sum(np.dot((W-np.dot(R,S)),D), 1) / (np.sum(D)+eps) # T = sum((W-R*S)*D, 1) / (sum(D)+eps)
         W2fit = np.copy(W)
         W2fit[0] -= T[0]
@@ -419,7 +415,7 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
             print('Iter = ', iter, 'fval = ', fval)
 
         # check convergence
-        if np.abs(fval-fvaltml)/fvaltml < tol:
+        if np.abs(fval-fvaltml) / (fvaltml+eps) < tol:
             break
 
     # end iteration
@@ -427,19 +423,82 @@ def PoseFromKpts_WP(W, dict, weight=None, verb=True, lam=1, tol=1e-10):
     R2[0,:] = R[0,:]
     R2[1, :] = R[1, :]
     R2[2,:] = np.cross(R[0,:],R[1, :])
-    output = Output(S, M, R2, C ,C0, T, fval)
+    output = Output(S=S, M=M, R=R2, C=C ,C0=C0, T=T, fval=fval)
 
     return output
 
-def PoseFromKpts_FP():
+def PoseFromKpts_FP(W, dict, R0=None, weight=None, verb=True, lam=1, tol=1e-10):
     '''
-    compute the pose with weak perspective
+    compute the pose with full perspective
+    solve in ||W*diag(Z)-R*S-T||^2 + ||C||^2 with S = C1*B1+...+Cn*Bn, Z denotes the depth of points
     :param W: the maximal responses in the headmap
     :param dict: the cad model
     :param varargin: other variables
     :return ; return a Output object containing many informations
     '''
-    pass
+    # data size
+    mu = np.copy(dict.mu)  # B is the base
+    pc = np.copy(dict.pc)
+    R = np.copy(R0)
+    # setting values
+    if weight is None:
+        D = np.eye(p)
+    else:
+        D = np.diag(weight)
+
+    # centralize basis
+    meanmu = np.mean(mu, 1)
+    for i in range(mu.shape[0]):
+        mu[i] -= meanmu[i]
+
+    # initialization
+    eps = sys.float_info.epsilon
+    S = mu
+    T = np.mean(W,1) * np.mean(np.std(np.dot(R[0:2,:],S),1)) / (np.mean(np.std(W,1))+eps)
+    C = 0
+
+    fval = np.inf
+
+    # iteration
+    for iter in range(1000):
+
+        # update the depth of Z
+        Z = np.dot(R,S)
+        for j in range(3):
+            Z[j] += T[j]
+
+        Z = np.sum(W * Z,0) / (np.sum(W**2, 0)+eps)
+
+        # update R and T by aligning S to W*diag(Z)
+        Sp = np.dot(W, np.diag(Z))
+        T = np.sum(np.dot(Sp-np.dot(R,S),D), 1) / (np.sum(np.diag(D))+eps)
+        St = Sp
+        for j in range(Sp.shape[0]):
+            St[j] -= T[j]
+
+        [U, _, V] = np.linalg.svd(np.dot(St,np.dot(D,np.transpose(S))))
+        R = np.dot(np.dot(U,np.diag([1 , 1 , np.linalg.det(np.dot(U,V))])),V)
+
+        # update C by least square
+        if len(pc) > 0:
+            pass
+            # TODO: implement this part
+
+        fvaltml = fval
+        fval = np.linalg.norm(np.dot(St-np.dot(R,S),np.sqrt(D)), 'fro')**2 + lam*np.linalg.norm(C)**2
+
+        # show output
+        if verb:
+            print('Iter = ',iter, 'fval = ',fval)
+
+        # check convergence
+        if np.abs(fval-fvaltml) / (fvaltml+eps) < tol:
+            break
+
+
+    output = Output(S=S, R=R, C=C, T=T, Z=Z, fval=fval)
+
+    return output
 
 def findRotation(S1,S2):
     '''
@@ -455,8 +514,8 @@ def findRotation(S1,S2):
     R = np.dot(S1,np.transpose(S2))
     # /!\ the matlab svd computes R = USV' and the python svd computes R = USV
     [U, _, V] = np.linalg.svd(R)
-    R = U*V
-    R = U * np.diag([1.0,1.0,np.linalg.det(R)]) * V
+    R = np.dot(U,V)
+    R = np.dot(U,  np.dot(np.diag([1.0,1.0,np.linalg.det(R)]), V))
 
     return R
 
@@ -497,6 +556,134 @@ def fullShape(S1,model):
     model_new.nb_vertices = len(vertices)
 
     return [model_new,w,R,T]
+
+def get_transform(center,scale,res):
+    '''
+    no idea what this think does
+    :param center:
+    :param scale:
+    :param res:
+    :return:
+    '''
+    h = 200*scale
+    t = np.eye(3)
+    t[0, 0] = res[1] / h
+    t[1, 1] = res[0] / h
+    t[0, 2] = res[1] * (-center[0] / h + 0.5)
+    t[1, 2] = res[0] * (-center[0] / h + 0.5)
+    t[2, 2] = 1
+
+    return t
+
+def transformHG(pt,center,scale,res,invert):
+    '''
+     no fucking idea what this think does
+    :param pt:
+    :param center:
+    :param scale:
+    :param res:
+    :param invert:
+    :return:
+    '''
+    t = get_transform(center,scale,res)
+
+    if invert:
+        t = np.linalg.inv(t)
+
+    new_pt = np.zeros(pt.shape)
+    new_pt[0] = pt[0]
+    new_pt[1] = pt[1] - 0.5
+    new_pt[2] = np.ones(new_pt[2].shape)
+
+    new_pt = np.dot(t,new_pt)
+    print(new_pt[0:2])
+    return new_pt[0:2]
+
+
+def mesh_kpts(image_name,verbosity=True, lam=1, tol=1e-10):
+    '''
+    take the image name and return the croped image, the image of the heatmap and the meshs of the cad model
+    :param image_name : the path/name of the image
+    :param verbosity : print or not some indermediate results
+    :param lam : usualy 1
+    :param tol : a little value used in convergence tests
+    :return : [cropped_image, heatmap, meshs]
+    '''
+    # loading the cad model
+    cad = Model()
+    cad.load_model()
+
+    # loading dict
+    dict = Template(cad)
+
+    # read heatmap and detect maximal responses
+    heatmap = readHM(image_name, 8)
+    [W_hp, score] = findWMax(heatmap);
+    lens_f = 319.4593
+    lens_f_rescale = lens_f / 640.0 * 64.0
+    W_hp[0] = W_hp[0] + 15.013 / 640.0 * 64.0
+    W_hp[1] = W_hp[1] - 64.8108 / 640 * 64.0
+    W_hp_norm = np.ones([3, len(W_hp[0])])
+    W_hp_norm[0] = (W_hp[0] - 32.0) / lens_f_rescale
+    W_hp_norm[1] = (W_hp[1] - 32.0) / lens_f_rescale
+
+    # pose estimation weak perspective
+    opt_wp = PoseFromKpts_WP(W_hp, dict, weight=score, verb=verbosity, lam=lam, tol=tol)
+
+    # pose estimation full perspective
+    opt_fp = PoseFromKpts_FP(W_hp_norm, dict, R0=opt_wp.R, weight=score, verb=verbosity, lam=1, tol=1e-10);
+
+    lens_f_cam = lens_f_rescale * 4
+    K_cam = [[lens_f_cam, 0, 128], [0, lens_f_cam, 128], [0, 0, 1]]
+
+    # we use cv2 to read the image to use the cv2 function later
+    img = cv2.imread(image_name)
+
+    # crop image
+    center = [128, 128]
+    scale = 1.28
+    cropImage(img, center, scale)
+    img_crop = cv2.resize(img, (200, 200)) / 255.0
+
+    # weak perspective
+    S_wp = np.dot(opt_wp.R, opt_wp.S)
+    S_wp[0] += opt_wp.T[0]
+    S_wp[1] += opt_wp.T[1]
+
+    # full perspective
+    S_fp = np.dot(opt_fp.R,opt_fp.S)
+    for i in range(S_fp.shape[0]):
+        S_fp[i] += opt_fp.T[i]
+
+    # computation of the polygon weak perspective
+    [model_wp, _, _, _] = fullShape(S_wp, cad)
+    mesh2d_wp = np.transpose(model_wp.vertices[:, 0:2]) * 200 / heatmap.shape[1]
+    # adding the camera parameters
+    mesh2d_wp[0] += -15.013 / 3.2
+    mesh2d_wp[1] += 64.8108 / 3.2
+
+    # computation of the polygon full perspective
+    [model_fp, _, _, _] = fullShape(S_fp, cad)
+    mesh2d_fp = np.dot(K_cam,np.transpose(model_fp.vertices))
+    # adding camera parameters
+    mesh2d_fp[0] /= mesh2d_fp[2]
+    mesh2d_fp[1] /= mesh2d_fp[2]
+    mesh2d_fp = transformHG(mesh2d_fp, center, scale, heatmap.shape[0:2], False) * 200 / heatmap.shape[1]
+    mesh2d_fp[0] += -15.013 / 3.2
+    mesh2d_fp[1] += 64.8108 / 3.2
+
+    # computation of the sum of the heatmap
+    response = np.sum(heatmap, 2)
+
+    max_value = np.amax(response)
+    min_value = np.amin(response)
+
+    response = (response - min_value) / (max_value - min_value)
+
+    cmap = plt.get_cmap('jet')
+    mapIm = np.delete(cv2.resize(cmap(response), (200, 200)), 3, 2)
+
+    return [img_crop, mapIm, np.transpose(mesh2d_wp), np.transpose(mesh2d_fp), opt_fp.R, opt_fp.T]
 
 
 

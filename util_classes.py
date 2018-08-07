@@ -142,12 +142,13 @@ class Output:
     An object of this class represents the output of the function PoseFromKpts_WP or PoseFromKpts_FP
     '''
 
-    def __init__(self, S, M, R, C, C0, T, fval):
+    def __init__(self, S=[], M=[], R=[], C=[], C0=[], T=[], Z=[], fval=0):
         self.S = S
         self.M = M
         self.R = R
         self.C = C
         self.C0 = C0
         self.T = T
+        self.Z = Z
         self.fval = fval
 

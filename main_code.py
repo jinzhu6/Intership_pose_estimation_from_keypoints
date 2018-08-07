@@ -25,8 +25,6 @@ dict = Template(cad)
 heatmap = readHM('./images_test/val_01_00_000000.bmp', 8)
 [W_hp, score] = findWMax(heatmap)
 
-plt.plot(W_hp[0]/64*256-32,W_hp[1]/64*256-32, 'rx')
-
 lens_f = 319.4593
 lens_f_rescale = lens_f / 640.0 * 64.0
 W_hp[0] = W_hp[0] + 15.013 / 640.0*64.0
@@ -41,29 +39,14 @@ W_hp_norm[1] = W_hp[1] - 32.0 / lens_f_rescale
 # pose estimation weak perspective
 opt_wp = PoseFromKpts_WP(W_hp, dict, weight=score, verb=True,  lam=1, tol=1e-10)
 
-# S R C0 pas bon
-#print(opt_wp.fval)
-
-
-
-
-
-
-
-
-
-
-
+# S R C0 sans doute bon
 
 lens_f_cam = lens_f_rescale * 4
-K_cam = [[lens_f_cam, 0, 128],[0, lens_f_cam, 128],[0, 0, 1]]
+K_cam = np.array([[lens_f_cam, 0, 128],[0, lens_f_cam, 128],[0, 0, 1]])
 
 # we use cv2 to read the image to use the cv2 function later
 img = cv2.imread('./images_test/val_01_00_000000.bmp')
 
-
-plt.imshow(img)
-#plt.show()
 
 
 # crop image
@@ -82,9 +65,11 @@ S_wp[1] += opt_wp.T[1]
 
 mesh2d_wp = np.transpose(model_wp.vertices[:,0:2])*200/heatmap.shape[1]
 # adding the camera parameters
-mesh2d_wp[0] += -15.013
-mesh2d_wp[1] += 64.8108
-mesh2d_wp[0] /= 3.2
+
+mesh2d_wp[0] += -15.013/3.2
+mesh2d_wp[1] += 64.8108/3.2
+
+
 
 # computation of the sum of the heatmap
 response = np.sum(heatmap,2)
@@ -100,6 +85,9 @@ mapIm = np.delete(cv2.resize(cmap(response),(200,200)),3,2)
 imgToShow = 0.5*mapIm + img_crop*0.5
 
 
-
-polygon = Polygon(np.transpose(mesh2d_wp))
-
+fig,p=plt.subplots(1)
+p.imshow(imgToShow)
+#plt.plot(mesh2d_wp[0],mesh2d_wp[1])
+polygon = Polygon(np.transpose(mesh2d_wp),linewidth=1,edgecolor='r',facecolor='none')
+p.add_patch(polygon)
+plt.show()
