@@ -26,7 +26,7 @@ def readHM(filepath, M):
 
     HM = np.zeros([64,64,M])
     for i in range(M):
-        hm_name = filepath[0:30] + '_{:02d}'.format(i+1) + '.bmp'
+        hm_name = filepath[0:len(filepath)-4] + '_{:02d}'.format(i+1) + filepath[len(filepath)-4:len(filepath)]
         #print(hm_name)
         HM[:,:,i] = plt.imread(hm_name)
 
@@ -591,7 +591,7 @@ def transformHG(pt,center,scale,res,invert):
     new_pt[2] = np.ones(new_pt[2].shape)
 
     new_pt = np.dot(t,new_pt)
-    print(new_pt[0:2])
+
     return new_pt[0:2]
 
 
