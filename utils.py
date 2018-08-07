@@ -479,11 +479,6 @@ def PoseFromKpts_FP(W, dict, R0=None, weight=None, verb=True, lam=1, tol=1e-10):
         [U, _, V] = np.linalg.svd(np.dot(St,np.dot(D,np.transpose(S))))
         R = np.dot(np.dot(U,np.diag([1 , 1 , np.linalg.det(np.dot(U,V))])),V)
 
-        # update C by least square
-        if len(pc) > 0:
-            pass
-            # TODO: implement this part
-
         fvaltml = fval
         fval = np.linalg.norm(np.dot(St-np.dot(R,S),np.sqrt(D)), 'fro')**2 + lam*np.linalg.norm(C)**2
 
