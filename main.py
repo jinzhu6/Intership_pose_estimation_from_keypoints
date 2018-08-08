@@ -58,7 +58,7 @@ def main():
     ax7.axes.get_yaxis().set_visible(False)
     ax7.set_title('cad fp')
     ax7.imshow(img_crop)
-    polygon = Polygon(mesh2d_fp, linewidth=1, edgecolor='g', facecolor='none')
+    polygon = Polygon(mesh2d_wp, linewidth=1, edgecolor='g', facecolor='none')
     ax7.add_patch(polygon)
 
     ax8 = fig.add_subplot(144)
@@ -68,6 +68,10 @@ def main():
     ax8.imshow(img_with_keypoints)
     polygon = Polygon(mesh2d_fp, linewidth=1, edgecolor='g', facecolor='none')
     ax8.add_patch(polygon)
+
+
+    #fig.savefig('./image_rapport/Figure_11.png',bbox_inches='tight')
+
 
     fig.subplots_adjust(wspace=0)
 
