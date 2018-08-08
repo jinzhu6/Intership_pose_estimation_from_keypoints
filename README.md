@@ -10,3 +10,5 @@ Feel free to use this code if you need it.
 call main.py to create a figure with the cad projection on it. There is an exemple of the data you need in the folder images_test
 
 The code is pretty simple to adapt, if you have question ask me.
+
+The video maker is not very optimized, it saves all the frame, you can use it almost the same way than main.py
