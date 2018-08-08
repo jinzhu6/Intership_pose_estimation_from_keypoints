@@ -28,7 +28,7 @@ def readHM(filepath, M):
     for i in range(M):
         hm_name = filepath[0:len(filepath)-4] + '_{:02d}'.format(i+1) + filepath[len(filepath)-4:len(filepath)]
         #print(hm_name)
-        HM[:,:,i] = plt.imread(hm_name)
+        HM[:,:,i] = cv2.imread(hm_name)[:,:,0]
 
     return HM/255.0
 
