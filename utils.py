@@ -223,8 +223,7 @@ def estimateR_weighted(S,W,D,R0):
         f = np.trace(np.dot(np.transpose(E),np.dot(D,E)))/2
 
         return f
-    # TODO : compare the performance of the default gradient and this gradient
-    # TODO : debug this custom grad function
+
     def grad(X):
         '''
         grad function of the manifold, the gradient is the reimannian gradient computed with the manifold
@@ -595,6 +594,7 @@ def transformHG(pt,center,scale,res,invert):
     return new_pt[0:2]
 
 
+
 def mesh_kpts(image_name,verbosity=True, lam=1, tol=1e-10):
     '''
     take the image name and return the croped image, the image of the heatmap and the meshs of the cad model
@@ -614,6 +614,8 @@ def mesh_kpts(image_name,verbosity=True, lam=1, tol=1e-10):
     # read heatmap and detect maximal responses
     heatmap = readHM(image_name, 8)
     [W_hp, score] = findWMax(heatmap);
+    print(W_hp,"\n")
+    print(score,"\n")
     lens_f = 319.4593
     lens_f_rescale = lens_f / 640.0 * 64.0
     W_hp[0] = W_hp[0] + 15.013 / 640.0 * 64.0

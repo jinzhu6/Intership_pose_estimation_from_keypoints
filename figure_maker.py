@@ -96,12 +96,12 @@ def main():
     ax6.add_patch(polygon)
 
 
-    fig1.savefig('./image_rapport/Figure_11.png', bbox_inches='tight')
-    fig2.savefig('./image_rapport/Figure_21.png', bbox_inches='tight')
-    fig3.savefig('./image_rapport/Figure_31.png', bbox_inches='tight')
-    fig4.savefig('./image_rapport/Figure_41.png', bbox_inches='tight')
-    fig5.savefig('./image_rapport/Figure_51.png', bbox_inches='tight')
-    fig6.savefig('./image_rapport/Figure_61.png', bbox_inches='tight')
+    fig1.savefig('./image_rapport/Figure_11_nodann.png', bbox_inches='tight')
+    fig2.savefig('./image_rapport/Figure_21_nodann.png', bbox_inches='tight')
+    fig3.savefig('./image_rapport/Figure_31_nodann.png', bbox_inches='tight')
+    fig4.savefig('./image_rapport/Figure_41_nodann.png', bbox_inches='tight')
+    fig5.savefig('./image_rapport/Figure_51_nodann.png', bbox_inches='tight')
+    fig6.savefig('./image_rapport/Figure_61_nodann.png', bbox_inches='tight')
 
 
 
