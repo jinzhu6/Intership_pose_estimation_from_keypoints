@@ -12,3 +12,9 @@ call main.py to create a figure with the cad projection on it. There is an exemp
 The code is pretty simple to adapt, if you have question ask me.
 
 The video maker is not very optimized, it saves all the frame, you can use it almost the same way than main.py
+
+
+**C++ code**
+
+I made a c++ version of the code. It is faster and suitable for real time application. The code currently print the rotation of the translation matrix.
+The code need GSL and OpenCV to work. When you installed this libraries, the *make* should works and give you a executable.  
