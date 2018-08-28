@@ -21,9 +21,9 @@ std::map<integer *, integer> *CheckMemoryDeleted;
 int get_pascal_template(model cad, dictonnaire dict)
 {
 
-    gsl_matrix* S = gsl_matrix_calloc(3,8);
+    gsl_matrix* S = gsl_matrix_calloc(dict.m,dict.nb_joints);
 
-    for (int i = 0 ; i < 8 ; i++)
+    for (int i = 0 ; i < dict.nb_joints ; i++)
     {
         gsl_matrix_set(S,0,i,cad.kp[i][0]);
         gsl_matrix_set(S,1,i,cad.kp[i][1]);
@@ -31,9 +31,9 @@ int get_pascal_template(model cad, dictonnaire dict)
     }
 
     //copy of S in mu
-    for (int i = 0 ; i < 3 ; ++i)
+    for (int i = 0 ; i < dict.m ; ++i)
     {
-        for(int j = 0 ; j < 8 ; j++)
+        for(int j = 0 ; j < dict.nb_joints ; j++)
         {
             gsl_matrix_set(dict.mu,i,j,gsl_matrix_get(S,i,j));
         }
@@ -43,15 +43,16 @@ int get_pascal_template(model cad, dictonnaire dict)
     normalizeS(S);
 
     // copy of S into B
-    for (int i = 0 ; i < 3 ; ++i)
+    for (int i = 0 ; i < dict.m ; ++i)
     {
-        for(int j = 0 ; j < 8 ; j++)
+        for(int j = 0 ; j < dict.nb_joints ; j++)
         {
             gsl_matrix_set(dict.B,i,j,gsl_matrix_get(S,i,j));
         }
     }
     return 0;
 }
+
 
 // this function implements the function prox_2norm in the matlab code, Z and lam are arguments and X and normX are the output
 // Z is a m by n matrix m > n
@@ -355,7 +356,7 @@ gsl_matrix* testPoseEstimation(double *A, double *B, double *D, integer n, integ
 	    solver->Debug = NOOUTPUT;
 	}
 
-	solver->Max_Iteration = 20;
+	solver->Max_Iteration = 10;
 	//solver->CheckParams();
 	solver->Run();
 
@@ -405,6 +406,9 @@ double estimateC_weighted(gsl_matrix* W, gsl_matrix* R, gsl_matrix* B, gsl_matri
 
     int p = W->size1;
     int k = B->size1 / 3;
+    int Bsize2 = B->size2;
+    int Rsize1 = R->size1;
+    int Wsize2 = W->size2;
     gsl_vector* d = gsl_vector_alloc(inD->size1); // d = diag(D)
 
     for(int i = 0 ; i < inD->size1 ; i++)
@@ -420,18 +424,18 @@ double estimateC_weighted(gsl_matrix* W, gsl_matrix* R, gsl_matrix* B, gsl_matri
     }
 
     // next we work on the linear system y = X*C
-    gsl_matrix* y = gsl_matrix_calloc(p * W->size2, 1); // y is just W flattened
-    for(int i = 0 ; i < W->size2 ; i++)
+    gsl_matrix* y = gsl_matrix_calloc(p * Wsize2, 1); // y is just W flattened
+    for(int i = 0 ; i < Wsize2 ; i++)
     {
         for(int j = 0 ; j < p ; j++)
         {
-            gsl_matrix_set(y, i+j*W->size2, 0, gsl_matrix_get(W ,j ,i));
+            gsl_matrix_set(y, i+j*Wsize2, 0, gsl_matrix_get(W ,j ,i));
         }
     }
 
     gsl_matrix* X = gsl_matrix_calloc(2*p,k); // each column is rotated Bi
-    gsl_matrix* Bi = gsl_matrix_calloc(3, B->size2); // Bi = B[3*ik:3*(ik+1),:]
-    gsl_matrix* RBi = gsl_matrix_alloc(R->size1, B->size2);
+    gsl_matrix* Bi = gsl_matrix_calloc(3, Bsize2); // Bi = B[3*ik:3*(ik+1),:]
+    gsl_matrix* RBi = gsl_matrix_alloc(Rsize1, Bsize2);
     for(int ik = 0 ; ik < k ; ik++)
     {
         for(int i = 3*ik ; i < 3*(ik+1) ; i++)
@@ -457,10 +461,10 @@ double estimateC_weighted(gsl_matrix* W, gsl_matrix* R, gsl_matrix* B, gsl_matri
     }
 
     // we want to calculate C = pinv(X'*D*X+lam*eye(size(X,2)))*X'*D*y and then C = C'
-    gsl_matrix* XD = gsl_matrix_alloc(1,16);
+    gsl_matrix* XD = gsl_matrix_alloc(1,2*p);
     gsl_matrix* XDX = gsl_matrix_alloc(1,1);
     gsl_matrix* XDy = gsl_matrix_alloc(1,1);
-    gsl_matrix* eye = gsl_matrix_alloc(X->size2,X->size2);
+    gsl_matrix* eye = gsl_matrix_alloc(k,k);
     gsl_matrix_set_identity(eye);
 
     gsl_matrix_scale(eye,lam);
@@ -948,11 +952,22 @@ pose pose_from_kps_FP(gsl_matrix* W, dictonnaire dict, gsl_matrix* R, gsl_vector
 }
 
 // this function takes an image as input and return the key points
-pose find_maximal_response(int nb_joints)
+pose find_maximal_response(char imname[], char keypointname[], char verbosity[])
 {
 
-    // name of the image
-    char imname[] = "./../images_test/val_01_00_000000.bmp";
+    // creation of the cad model and the dict
+    dictonnaire dict;
+    model cad;
+
+    const int nb_joints = cad.nb_joints;
+    const int dim = cad.dim;
+
+    dict.nb_joints = nb_joints; // number of joints of the model
+    dict.m = dim; // dimension of the space
+    dict.B = gsl_matrix_alloc(dim,nb_joints);
+    dict.mu = gsl_matrix_alloc(dim,nb_joints);
+    dict.pc = nullptr;
+
 
     // open the image
     Mat image;
@@ -962,12 +977,14 @@ pose find_maximal_response(int nb_joints)
     // find the keypoints the keypoints first line is the values and the lignes 1 and 2 are the coordinates
     gsl_matrix* keypoints = gsl_matrix_calloc(nb_joints,3);
     gsl_vector* tmp;
-    char keypointname[] = "./../images_test/val_01_00_000000_00.bmp";
+    const int len = strlen(keypointname);
+    printf("len = %d\n",len);
+    printf("%s\n",keypointname);
 
     // computation of the maximums
     for(int i=0 ; i<nb_joints ; i++)
     {
-        keypointname[35] = (char)(i+1)+48; // set the correct name
+        keypointname[len-5] = (char)(i+1)+48; // set the correct name
         tmp = find_max_image(imread(keypointname,0)); // open the image and find the max value and coordinates
 
         for(int j=0 ; j < 3 ; j++)
@@ -1000,9 +1017,7 @@ pose find_maximal_response(int nb_joints)
         gsl_matrix_set(W_hp_norm,i,2, 1);
     }
 
-    // creation of the cad model and the dict
-    model cad;
-    dictonnaire dict;
+
     get_pascal_template(cad,dict);
 
     //initialization of the weight, verb, lam and tol that are arguments of pose_from_kps_WP
@@ -1012,8 +1027,13 @@ pose find_maximal_response(int nb_joints)
         gsl_vector_set(weight, j, gsl_matrix_get(keypoints,j,0));
     }
 
-    pose output_wp = pose_from_kps_WP(W_hp, dict, weight, false, 1, 1e-10);
-    pose output_fp = pose_from_kps_FP(matrix_transpose(W_hp_norm),dict,output_wp.R,weight,false,1,1e-10);
+    bool verb;
+    if (strcmp(verbosity,"verbose") == 0)
+        verb = true;
+    else verb = false;
+
+    pose output_wp = pose_from_kps_WP(W_hp, dict, weight, verb, 1, 1e-10);
+    pose output_fp = pose_from_kps_FP(matrix_transpose(W_hp_norm),dict,output_wp.R,weight,verb,1,1e-10);
 
     return output_fp;
 
@@ -1021,27 +1041,45 @@ pose find_maximal_response(int nb_joints)
 }
 
 
-int main(void)
+int main(int argc,char* argv[])
 {
+
+    // argv[2] : name of the image
+    // argv[3] : name of the keypoints
+
+
     clock_t start, stop;
     double totalTime;
-
     start = clock();
 
-    pose output_fp;
 
-    output_fp = find_maximal_response(8);
+    int counter;
+    printf("Program Name Is: %s",argv[0]);
+    if(argc==1)
+    {
+        printf("\nNo Extra Command Line Argument Passed\nDefault arguments used");
+    }
+    if(argc>=2)
+    {
+        printf("\nNumber Of Arguments Passed: %d",argc);
+        printf("\n----Following Are The Command Line Arguments Passed----");
+        for(counter=0;counter<argc;counter++)
+            printf("\nargv[%d]: %s",counter,argv[counter]);
+    }
+    printf("\n");
 
-    printf("R\n");
+
+    pose output_fp = find_maximal_response(argv[1],argv[2],argv[3]);
+
+    printf("\nR\n");
     print_matrix(output_fp.R);
     printf("T\n");
     print_vector(output_fp.T);
 
     stop = clock();
     totalTime = (stop - start) / (double)CLOCKS_PER_SEC;
-
-
-
     printf("computation time = %f\n",totalTime);
+
+
     return 0;
 }

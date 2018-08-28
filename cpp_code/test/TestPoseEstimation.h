@@ -63,11 +63,8 @@ using namespace cv;
 using namespace std;
 
 #if defined(TESTPOSEESTIMATION)
-int main(void);
+int main(int argc,char* argv[]);
 #endif
-
-
-
 
 
 // create the pascal template, see the matlab code
@@ -104,7 +101,7 @@ pose pose_from_kps_WP(gsl_matrix* W, dictonnaire dict, gsl_vector* weight, bool 
 pose pose_from_kps_FP(gsl_matrix* W, dictonnaire dict, gsl_matrix* R, gsl_vector* weight, bool verb, int lam_val, double tol);
 
 // this function takes an image as input and return the key points
-pose find_maximal_response(int nb_joints);
+pose find_maximal_response(char imname[], char keypointname[], gsl_vector* defscale, gsl_matrix* defkp);
 
 /*function to use the manifold optimization*/
 gsl_matrix* testPoseEstimation(double *A, double *B, double *D, integer n, integer p, double *X = nullptr, double *Xopt = nullptr, bool verb=true);

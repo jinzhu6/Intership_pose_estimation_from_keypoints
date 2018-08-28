@@ -167,45 +167,47 @@ double matrix_trace(gsl_matrix* A)
     return trace;
 }
 
-// this function normalizes a array 3*8
+// this function normalizes an array following the first dim
 int normalizeS(gsl_matrix* res)
 {
-    double tab_mean[3] = {0,0,0};
-    double tab_std[3] = {0,0,0};
+    int s1 = res->size1;
+    int s2 = res->size2;
+    gsl_vector* tab_mean = gsl_vector_calloc(s1);
+    gsl_vector* tab_std = gsl_vector_calloc(s1);
 
     // computation of the mean
-    for(int i = 0 ; i < 3 ; i++)
+    for(int i = 0 ; i < s1 ; i++)
     {
-        for(int j = 0 ; j < 8 ; j++)
+        for(int j = 0 ; j < s2 ; j++)
         {
-            tab_mean[i] += gsl_matrix_get(res,i,j) / 8;
+            gsl_vector_set(tab_mean,i,gsl_vector_get(tab_mean,i) + gsl_matrix_get(res,i,j) / s2);
         }
     }
 
     // modification of S
-    for(int i = 0 ; i < 3 ; i++)
+    for(int i = 0 ; i < s1 ; i++)
     {
-        for(int j = 0 ; j < 8 ; j++)
+        for(int j = 0 ; j < s2 ; j++)
         {
-            gsl_matrix_set(res,i,j,gsl_matrix_get(res,i,j) - tab_mean[i]);
+            gsl_matrix_set(res,i,j,gsl_matrix_get(res,i,j) - gsl_vector_get(tab_mean,i));
         }
     }
 
     // computation of the standard deviation
-    for(int i = 0 ; i < 3 ; i++)
+    for(int i = 0 ; i < s1 ; i++)
     {
-        for(int j = 0 ; j < 8 ; j++)
+        for(int j = 0 ; j < s2 ; j++)
         {
-            tab_std[i] += pow(gsl_matrix_get(res,i,j),2) / 8;
+            gsl_vector_set(tab_std,i, gsl_vector_get(tab_std,i) + pow(gsl_matrix_get(res,i,j),2) / s2);
         }
-        tab_std[i] = sqrt( tab_std[i] - pow(tab_mean[i],2) );
+        gsl_vector_set(tab_std,i, sqrt( gsl_vector_get(tab_std,i) - pow(gsl_vector_get(tab_mean,i),2) ));
     }
 
     // modification of S
-    double std = (tab_std[0] + tab_std[1] + tab_std[2])/3;
-    for(int i = 0 ; i < 3 ; i++)
+    double std = vector_sum(tab_std)/s1;
+    for(int i = 0 ; i < s1 ; i++)
     {
-        for(int j = 0 ; j < 8 ; j++)
+        for(int j = 0 ; j < s2 ; j++)
         {
             gsl_matrix_set(res,i,j,gsl_matrix_get(res,i,j) / std);
         }
@@ -237,11 +239,10 @@ gsl_vector* find_max_image(Mat image)
             if(val > gsl_vector_get(res,0))
             {
                 gsl_vector_set(res, 0, val);
-                gsl_vector_set(res, 1, i+1);
-                gsl_vector_set(res, 2, j+1); //TODo : supprimer les +1 qund le debug est fini
+                gsl_vector_set(res, 1, i);
+                gsl_vector_set(res, 2, j);
             }
         }
-        //TODO : pourquoi il lit pqs bien les images bordel
     }
     return res;
 }
