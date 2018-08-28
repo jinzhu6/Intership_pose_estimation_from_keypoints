@@ -18,7 +18,7 @@ The c++ main take three arguments :
 
     1. the path the image (example : ./../images_test/val_01_00_000000.bmp)
     2. the path to the keypoints (example : ./../images_test/val_01_00_000000_00.bmp)
-    3. verbosity, give v or verbose for a verbose output, anythink else for a no verbose output
+    3. verbosity, give verbose for a verbose output, anythink else for a no verbose output
     
 the other parameters like the number of joints, the data related to the cad model, the dimention, the name of the joints...
 should be modified in the ***utils_struct.h*** part of the code.  
